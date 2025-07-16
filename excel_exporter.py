@@ -262,9 +262,18 @@ class ExcelExporter:
         # Add monthly flag to get detailed data
         cmd.append("--monthly")
         
+        # Add groups filter
+        if config_data.get('groups'):
+            cmd.extend(["--groups"] + config_data['groups'])
+        
+        # Add login range filters
+        if config_data.get('min_login'):
+            cmd.extend(["--min-login", str(config_data['min_login'])])
+        
+        if config_data.get('max_login'):
+            cmd.extend(["--max-login", str(config_data['max_login'])])
+        
         # Note: deals_categorizer.py doesn't currently support:
-        # - groups filter
-        # - login range filter  
         # - profit range filter
         # - agent filter
         # - zip filter

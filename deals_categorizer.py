@@ -177,30 +177,53 @@ class DealsCategorizerTool:
         except Error as e:
             print(f"✗ Error analyzing comments: {e}")
     
-    def get_categorized_deals(self, year: int = 2025, limit: Optional[int] = None) -> List[Dict]:
+    def get_categorized_deals(self, year: int = 2025, limit: Optional[int] = None, groups: Optional[List[str]] = None, 
+                             min_login: Optional[int] = None, max_login: Optional[int] = None) -> List[Dict]:
         """Get deals with cmd=2 categorized by comments"""
         try:
             cursor = self.connection.cursor()
             
             deals_table = f"mt5_deals_{year}"
             
+            # Build WHERE clause with filters
+            where_conditions = ["d.Action = 2", "d.Login > 9999"]
+            query_params = []
+            
+            # Add login range filters
+            if min_login is not None:
+                where_conditions.append("d.Login >= %s")
+                query_params.append(min_login)
+            
+            if max_login is not None:
+                where_conditions.append("d.Login <= %s")
+                query_params.append(max_login)
+            
+            # Add group filter - need to join with mt5_users table
+            group_join = ""
+            if groups:
+                group_join = "LEFT JOIN mt5_users u ON d.Login = u.Login"
+                group_placeholders = ','.join(['%s'] * len(groups))
+                where_conditions.append(f"u.Group IN ({group_placeholders})")
+                query_params.extend(groups)
+            
+            where_clause = " AND ".join(where_conditions)
             limit_clause = f"LIMIT {limit}" if limit else ""
             
             query = f"""
             SELECT 
-                Deal,
-                Login,
-                Time,
-                Comment,
-                Profit
-            FROM {deals_table}
-            WHERE Action = 2 
-            AND Login > 9999
-            ORDER BY Login ASC, Time ASC
+                d.Deal,
+                d.Login,
+                d.Time,
+                d.Comment,
+                d.Profit
+            FROM {deals_table} d
+            {group_join}
+            WHERE {where_clause}
+            ORDER BY d.Login ASC, d.Time ASC
             {limit_clause}
             """
             
-            cursor.execute(query)
+            cursor.execute(query, query_params)
             results = cursor.fetchall()
             
             categorized_deals = []
@@ -224,7 +247,8 @@ class DealsCategorizerTool:
             print(f"✗ Error getting categorized deals: {e}")
             return []
 
-    def get_monthly_deals_by_login(self, year: int = None, limit: Optional[int] = None) -> List[Dict]:
+    def get_monthly_deals_by_login(self, year: int = None, limit: Optional[int] = None, groups: Optional[List[str]] = None, 
+                                  min_login: Optional[int] = None, max_login: Optional[int] = None) -> List[Dict]:
         """Get current month action=2 deals grouped by login with categories (optimized for current month only)"""
         try:
             cursor = self.connection.cursor()
@@ -245,6 +269,26 @@ class DealsCategorizerTool:
             
             deals_table = f"mt5_deals_{year}"
             
+            # Build WHERE clause with filters
+            where_conditions = ["d.Action = 2", "d.Login > 9999", "d.Time >= %s", "d.Time < %s"]
+            query_params = [month_start, month_end]
+            
+            # Add login range filters
+            if min_login is not None:
+                where_conditions.append("d.Login >= %s")
+                query_params.append(min_login)
+            
+            if max_login is not None:
+                where_conditions.append("d.Login <= %s")
+                query_params.append(max_login)
+            
+            # Add group filter
+            if groups:
+                group_placeholders = ','.join(['%s'] * len(groups))
+                where_conditions.append(f"u.Group IN ({group_placeholders})")
+                query_params.extend(groups)
+            
+            where_clause = " AND ".join(where_conditions)
             limit_clause = f"LIMIT {limit}" if limit else ""
             
             # Optimized query for current month only with index hints
@@ -262,14 +306,12 @@ class DealsCategorizerTool:
                 u.ZipCode
             FROM {deals_table} d
             LEFT JOIN mt5_users u ON d.Login = u.Login
-            WHERE d.Action = 2 
-            AND d.Login > 9999
-            AND d.Time >= %s AND d.Time < %s
+            WHERE {where_clause}
             ORDER BY d.Login ASC, d.Time ASC
             {limit_clause}
             """
             
-            cursor.execute(query, (month_start, month_end))
+            cursor.execute(query, query_params)
             results = cursor.fetchall()
             
             print(f"✓ Found {len(results)} deals in current month")
@@ -299,7 +341,7 @@ class DealsCategorizerTool:
         except Error as e:
             print(f"✗ Error getting monthly deals: {e}")
             return []
-    
+
     def get_summary_by_category(self, year: int = None) -> Dict:
         """Get summary statistics by category for current month only"""
         try:
@@ -338,7 +380,7 @@ class DealsCategorizerTool:
             ORDER BY deal_count DESC
             """
             
-            cursor.execute(query)
+            cursor.execute(query, (month_start, month_end))
             results = cursor.fetchall()
             
             summary = {
@@ -433,202 +475,6 @@ class DealsCategorizerTool:
         except Error as e:
             print(f"✗ Error analyzing comments: {e}")
     
-    def get_categorized_deals(self, year: int = 2025, limit: Optional[int] = None) -> List[Dict]:
-        """Get deals with cmd=2 categorized by comments"""
-        try:
-            cursor = self.connection.cursor()
-            
-            deals_table = f"mt5_deals_{year}"
-            
-            limit_clause = f"LIMIT {limit}" if limit else ""
-            
-            query = f"""
-            SELECT 
-                Deal,
-                Login,
-                Time,
-                Comment,
-                Profit
-            FROM {deals_table}
-            WHERE Action = 2 
-            AND Login > 9999
-            ORDER BY Login ASC, Time ASC
-            {limit_clause}
-            """
-            
-            cursor.execute(query)
-            results = cursor.fetchall()
-            
-            categorized_deals = []
-            
-            for deal, login, time, comment, profit in results:
-                category = self.categorize_comment(comment)
-                
-                categorized_deals.append({
-                    'deal_id': deal,
-                    'login': login,
-                    'time': time,
-                    'comment': comment or '',
-                    'profit': float(profit) if profit else 0.0,
-                    'category': category
-                })
-            
-            cursor.close()
-            return categorized_deals
-            
-        except Error as e:
-            print(f"✗ Error getting categorized deals: {e}")
-            return []
-
-    def get_monthly_deals_by_login(self, year: int = None, limit: Optional[int] = None) -> List[Dict]:
-        """Get current month action=2 deals grouped by login with categories (optimized for current month only)"""
-        try:
-            cursor = self.connection.cursor()
-            
-            # Display optimization info
-            display_deals_optimization_info()
-            
-            # Get current month info
-            month_info = get_current_month_info()
-            current_year = month_info['year']
-            current_month = month_info['month']
-            month_start = month_info['month_start']
-            month_end = month_info['month_end']
-            
-            # Use current year if not specified
-            if year is None:
-                year = current_year
-            
-            deals_table = f"mt5_deals_{year}"
-            
-            limit_clause = f"LIMIT {limit}" if limit else ""
-            
-            # Optimized query for current month only with index hints
-            # Also get agent and zip info from mt5_users table
-            query = f"""
-            SELECT /*+ USE_INDEX({deals_table}, Time) */
-                d.Deal,
-                d.Login,
-                d.Time,
-                d.Comment,
-                d.Profit,
-                YEAR(d.Time) as deal_year,
-                MONTH(d.Time) as deal_month,
-                u.Agent,
-                u.ZipCode
-            FROM {deals_table} d
-            LEFT JOIN mt5_users u ON d.Login = u.Login
-            WHERE d.Action = 2 
-            AND d.Login > 9999
-            AND d.Time >= %s AND d.Time < %s
-            ORDER BY d.Login ASC, d.Time ASC
-            {limit_clause}
-            """
-            
-            cursor.execute(query, (month_start, month_end))
-            results = cursor.fetchall()
-            
-            print(f"✓ Found {len(results)} deals in current month")
-            
-            monthly_deals = []
-            
-            for deal, login, time, comment, profit, deal_year, deal_month, agent, zip_code in results:
-                category = self.categorize_comment(comment)
-                
-                monthly_deals.append({
-                    'deal_id': deal,
-                    'login': login,
-                    'time': time,
-                    'year': deal_year,
-                    'month': deal_month,
-                    'month_name': time.strftime('%B') if time else f"Month {deal_month}",
-                    'comment': comment or '',
-                    'profit': float(profit) if profit else 0.0,
-                    'category': category,
-                    'agent': agent or '',
-                    'zip_code': zip_code or ''
-                })
-            
-            cursor.close()
-            return monthly_deals
-            
-        except Error as e:
-            print(f"✗ Error getting monthly deals: {e}")
-            return []
-    
-    def get_summary_by_category(self, year: int = None) -> Dict:
-        """Get summary statistics by category for current month only"""
-        try:
-            cursor = self.connection.cursor()
-            
-            # Get current month info
-            month_info = get_current_month_info()
-            current_year = month_info['year']
-            current_month = month_info['month']
-            month_start = month_info['month_start']
-            month_end = month_info['month_end']
-            
-            # Use current year if not specified
-            if year is None:
-                year = current_year
-            
-            print(f"📊 OPTIMIZATION: Getting summary for CURRENT MONTH ONLY: {month_start.strftime('%Y-%m-%d')} to {(month_end.replace(microsecond=0) - timedelta(seconds=1)).strftime('%Y-%m-%d')}")
-            print(f"⚡ PERFORMANCE: Ignoring all historical data for speed")
-            
-            deals_table = f"mt5_deals_{year}"
-            
-            # Optimized query for current month only with index hints
-            query = f"""
-            SELECT /*+ USE_INDEX({deals_table}, Time) */
-                Comment,
-                COUNT(*) as deal_count,
-                SUM(Profit) as total_profit,
-                AVG(Profit) as avg_profit,
-                MIN(Profit) as min_profit,
-                MAX(Profit) as max_profit
-            FROM {deals_table}
-            WHERE Action = 2 
-            AND Login > 9999
-            AND Time >= %s AND Time < %s
-            GROUP BY Comment
-            ORDER BY deal_count DESC
-            """
-            
-            cursor.execute(query)
-            results = cursor.fetchall()
-            
-            summary = {
-                "Deposit": {"count": 0, "total": 0, "avg": 0, "min": 0, "max": 0},
-                "Withdrawal": {"count": 0, "total": 0, "avg": 0, "min": 0, "max": 0},
-                "Promotion": {"count": 0, "total": 0, "avg": 0, "min": 0, "max": 0}
-            }
-            
-            for comment, count, total, avg, min_val, max_val in results:
-                category = self.categorize_comment(comment)
-                
-                summary[category]["count"] += count
-                summary[category]["total"] += float(total) if total else 0
-                
-                if summary[category]["count"] > 0:
-                    summary[category]["avg"] = summary[category]["total"] / summary[category]["count"]
-                
-                if min_val is not None:
-                    if summary[category]["min"] == 0:
-                        summary[category]["min"] = float(min_val)
-                    else:
-                        summary[category]["min"] = min(summary[category]["min"], float(min_val))
-                
-                if max_val is not None:
-                    summary[category]["max"] = max(summary[category]["max"], float(max_val))
-            
-            cursor.close()
-            return summary
-            
-        except Error as e:
-            print(f"✗ Error getting summary: {e}")
-            return {}
-
-
 def print_deals_table(deals: List[Dict], max_rows: int = 50):
     """Print deals in table format"""
     if not deals:
@@ -754,6 +600,25 @@ Examples:
     )
     
     parser.add_argument(
+        '--groups', '-g',
+        type=str,
+        nargs='*',
+        help='Filter by specific groups'
+    )
+    
+    parser.add_argument(
+        '--min-login',
+        type=int,
+        help='Minimum login ID'
+    )
+    
+    parser.add_argument(
+        '--max-login',
+        type=int,
+        help='Maximum login ID'
+    )
+    
+    parser.add_argument(
         '--samples',
         action='store_true',
         help='Show comment samples and exit'
@@ -806,9 +671,9 @@ Examples:
         print(f"\n🔍 Analyzing deals for year {args.year}...")
         
         if args.monthly:
-            deals = categorizer.get_monthly_deals_by_login(args.year, args.limit)
+            deals = categorizer.get_monthly_deals_by_login(args.year, args.limit, args.groups, args.min_login, args.max_login)
         else:
-            deals = categorizer.get_categorized_deals(args.year, args.limit)
+            deals = categorizer.get_categorized_deals(args.year, args.limit, args.groups, args.min_login, args.max_login)
         
         if not deals:
             print("✗ No deals found")

@@ -166,6 +166,9 @@ def get_daily_report(connection, target_date=None, limit=50, db_name='mt5gn_live
         # Add profit filters (will be applied after joining with monthly data)
         # For now, we'll collect all data and filter later
         
+        # Build limit clause
+        limit_clause = f"LIMIT {limit}" if limit is not None else ""
+        
         # Optimized main query for daily equity data (current month only)
         # Added index hints for better performance and JOIN with mt5_users for agent/zip filters
         daily_query = f"""
@@ -184,10 +187,9 @@ def get_daily_report(connection, target_date=None, limit=50, db_name='mt5gn_live
             LEFT JOIN mt5_users u ON d.Login = u.Login
             WHERE {' AND '.join(where_conditions)}
             ORDER BY d.Login
-            LIMIT %s
+            {limit_clause}
         """
         
-        query_params.append(limit)
         cursor.execute(daily_query, query_params)
         daily_data = cursor.fetchall()
         
@@ -668,7 +670,7 @@ def main():
     parser.add_argument('--database', '-db', type=str, default='mt5gn_live', 
                        help='Database to connect to (default: mt5gn_live)')
     parser.add_argument('--date', '-d', type=str, help='Target date (YYYY-MM-DD format, default: latest)')
-    parser.add_argument('--limit', '-l', type=int, default=50, help='Maximum number of records (default: 50)')
+    parser.add_argument('--limit', '-l', type=int, default=50000, help='Maximum number of records (default: 50000)')
     parser.add_argument('--all', '-a', action='store_true', help='Show all records (no limit)')
     parser.add_argument('--groups', '-g', type=str, nargs='*', help='Filter by specific groups')
     parser.add_argument('--min-login', type=int, help='Minimum login ID')
@@ -725,7 +727,7 @@ def main():
         if args.zip:
             print(f"   ZIP: {args.zip}")
         
-        report_data = get_daily_report(connection, target_date, limit or 1000, args.database, 
+        report_data = get_daily_report(connection, target_date, limit, args.database, 
                                      groups=args.groups, min_login=args.min_login, 
                                      max_login=args.max_login, min_profit=args.min_profit, 
                                      max_profit=args.max_profit, agent=args.agent, 
