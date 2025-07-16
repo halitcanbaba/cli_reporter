@@ -12,6 +12,12 @@ from typing import List, Dict
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 
+# Fix Windows encoding issues
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+
 
 class ExcelExporter:
     def __init__(self):
@@ -73,7 +79,7 @@ class ExcelExporter:
             # Build daily_report command and run it
             if config_data.get('database'):
                 daily_report_cmd = self._build_daily_report_command(config_data)
-                print(f"📊 Running daily report command: {' '.join(daily_report_cmd[:7])}...")
+                print(f"[R] Running daily report command: {' '.join(daily_report_cmd[:7])}...")
                 daily_report_data = self._run_command_and_capture_output(daily_report_cmd)
                 
                 if daily_report_data:
@@ -84,7 +90,7 @@ class ExcelExporter:
             # Build deals_categorizer command and run it  
             if config_data.get('database'):
                 deals_categorizer_cmd = self._build_deals_categorizer_command(config_data)
-                print(f"💳 Running deals categorizer command: {' '.join(deals_categorizer_cmd[:7])}...")
+                print(f"[C] Running deals categorizer command: {' '.join(deals_categorizer_cmd[:7])}...")
                 deals_categorizer_data = self._run_command_and_capture_output(deals_categorizer_cmd)
                 
                 if deals_categorizer_data:
@@ -110,7 +116,7 @@ class ExcelExporter:
             
             # Show sheet summary
             sheet_count = len(wb.sheetnames)
-            print(f"📊 Contains {sheet_count} sheets:")
+            print(f"[R] Contains {sheet_count} sheets:")
             for sheet_name in wb.sheetnames:
                 print(f"   - {sheet_name}")
             
@@ -262,7 +268,7 @@ class ExcelExporter:
     def _run_command_and_capture_output(self, command: List[str]) -> str:
         """Run a command and capture its output"""
         try:
-            print(f"🔄 Executing: {' '.join(command[:3])}...")
+            print(f"[>>] Executing: {' '.join(command[:3])}...")
             result = subprocess.run(
                 command,
                 capture_output=True,

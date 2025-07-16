@@ -9,7 +9,15 @@ from mysql.connector import Error
 import argparse
 import sys
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+import os
 from tabulate import tabulate
+
+# Fix Windows encoding issues
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
 
 # Import deals categorizer functionality
 try:
@@ -460,7 +468,7 @@ def print_daily_report(report_data, output_format='table'):
         print("❌ No data to display")
         return
     
-    print(f"\n💰 Daily Financial Report - {report_data[0]['report_date'].strftime('%Y-%m-%d')}")
+    print(f"\n[$] Daily Financial Report - {report_data[0]['report_date'].strftime('%Y-%m-%d')}")
     print("=" * 120)
     
     # Summary statistics
@@ -677,7 +685,7 @@ def main():
     # Set limit
     limit = None if args.all else args.limit
     
-    print("💰 Daily Financial Report Generator")
+    print("[$] Daily Financial Report Generator")
     print("=" * 50)
     
     # Connect to database

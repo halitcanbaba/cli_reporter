@@ -8,10 +8,17 @@ import mysql.connector
 from mysql.connector import Error
 import argparse
 import sys
-from datetime import datetime, date, timedelta
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+import os
+import re
 from tabulate import tabulate
-import json
-from typing import List, Dict, Optional
+
+# Fix Windows encoding issues
+if sys.platform == "win32":
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
 
 # Database connection parameters
 DB_CONFIGS = {
@@ -637,7 +644,7 @@ def print_deals_table(deals: List[Dict], max_rows: int = 50):
             (deal['comment'][:30] + '...') if len(deal['comment']) > 30 else deal['comment']
         ])
     
-    print(f"\n💳 Categorized Deals (showing {len(display_deals)} of {len(deals)} total)")
+    print(f"\n[C] Categorized Deals (showing {len(display_deals)} of {len(deals)} total)")
     print("=" * 100)
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
     
@@ -671,7 +678,7 @@ def print_monthly_deals_table(monthly_deals: List[Dict], max_rows: int = 50):
             deal.get('zip_code', '')
         ])
     
-    print(f"\n💳 Monthly Deals by Login (showing {len(display_deals)} of {len(monthly_deals)} total)")
+    print(f"\n[C] Monthly Deals by Login (showing {len(display_deals)} of {len(monthly_deals)} total)")
     print("=" * 120)
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
     
@@ -765,7 +772,7 @@ Examples:
     
     args = parser.parse_args()
     
-    print("💳 Deals Categorizer Tool")
+    print("[C] Deals Categorizer Tool")
     print("=" * 50)
     
     # Initialize categorizer

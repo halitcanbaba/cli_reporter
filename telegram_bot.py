@@ -188,12 +188,12 @@ class TelegramIntegration:
                     # Check if there's already an event loop running
                     try:
                         loop = asyncio.get_running_loop()
-                        print("🔄 Using existing event loop in thread")
+                        print("[>>] Using existing event loop in thread")
                     except RuntimeError:
                         # No loop running, create a new one
                         loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(loop)
-                        print("🔄 Created new event loop in thread")
+                        print("[>>] Created new event loop in thread")
                     
                     try:
                         result = loop.run_until_complete(
