@@ -249,25 +249,28 @@ class DealsCategorizerTool:
 
     def get_monthly_deals_by_login(self, year: int = None, limit: Optional[int] = None, groups: Optional[List[str]] = None, 
                                   min_login: Optional[int] = None, max_login: Optional[int] = None) -> List[Dict]:
-        """Get current month action=2 deals grouped by login with categories (optimized for current month only)"""
+        """Get action=2 deals grouped by login with categories for the current month"""
         try:
             cursor = self.connection.cursor()
-            
-            # Display optimization info
-            display_deals_optimization_info()
             
             # Get current month info
             month_info = get_current_month_info()
             current_year = month_info['year']
-            current_month = month_info['month']
-            month_start = month_info['month_start']
-            month_end = month_info['month_end']
             
             # Use current year if not specified
             if year is None:
                 year = current_year
             
             deals_table = f"mt5_deals_{year}"
+            
+            # Always use current month date range
+            month_start = month_info['month_start']
+            month_end = month_info['month_end']
+            
+            print(f"📊 DEALS CATEGORIZER - CURRENT MONTH DATA")
+            print(f"📅 Processing Month: {month_info['month_name']} {year}")
+            print(f"📊 Date Range: {month_start.strftime('%Y-%m-%d')} to {month_end.strftime('%Y-%m-%d')}")
+            print(f"🎯 Getting deals for current month only")
             
             # Build WHERE clause with filters
             where_conditions = ["d.Action = 2", "d.Login > 9999", "d.Time >= %s", "d.Time < %s"]
@@ -291,7 +294,7 @@ class DealsCategorizerTool:
             where_clause = " AND ".join(where_conditions)
             limit_clause = f"LIMIT {limit}" if limit else ""
             
-            # Optimized query for current month only with index hints
+            # Query for current month with index hints
             # Also get agent and zip info from mt5_users table
             query = f"""
             SELECT /*+ USE_INDEX({deals_table}, Time) */
@@ -314,7 +317,7 @@ class DealsCategorizerTool:
             cursor.execute(query, query_params)
             results = cursor.fetchall()
             
-            print(f"✓ Found {len(results)} deals in current month")
+            print(f"✓ Found {len(results)} deals in current month {month_info['month_name']} {year}")
             
             monthly_deals = []
             
@@ -343,27 +346,28 @@ class DealsCategorizerTool:
             return []
 
     def get_summary_by_category(self, year: int = None) -> Dict:
-        """Get summary statistics by category for current month only"""
+        """Get summary statistics by category for the current month"""
         try:
             cursor = self.connection.cursor()
             
             # Get current month info
             month_info = get_current_month_info()
             current_year = month_info['year']
-            current_month = month_info['month']
-            month_start = month_info['month_start']
-            month_end = month_info['month_end']
             
             # Use current year if not specified
             if year is None:
                 year = current_year
             
-            print(f"📊 OPTIMIZATION: Getting summary for CURRENT MONTH ONLY: {month_start.strftime('%Y-%m-%d')} to {(month_end.replace(microsecond=0) - timedelta(seconds=1)).strftime('%Y-%m-%d')}")
-            print(f"⚡ PERFORMANCE: Ignoring all historical data for speed")
+            # Always use current month date range
+            month_start = month_info['month_start']
+            month_end = month_info['month_end']
+            
+            print(f"📊 SUMMARY: Getting summary for CURRENT MONTH: {month_start.strftime('%Y-%m-%d')} to {month_end.strftime('%Y-%m-%d')}")
+            print(f"🎯 PERFORMANCE: Processing deals for current month only")
             
             deals_table = f"mt5_deals_{year}"
             
-            # Optimized query for current month only with index hints
+            # Query for current month with index hints
             query = f"""
             SELECT /*+ USE_INDEX({deals_table}, Time) */
                 Comment,
