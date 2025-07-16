@@ -46,7 +46,18 @@ pip install -r requirements.txt
    - Update database credentials in your configuration files
    - Ensure MySQL server is accessible
 
+4. **Cross-platform compatibility:**
+   - The tool automatically detects the correct Python command (`python` or `python3`)
+   - Works on Windows, macOS, and Linux systems
+   - No manual configuration needed for Python command detection
+
 ## Usage
+
+### Cross-Platform Command Execution
+The tool automatically detects the correct Python command based on your operating system:
+- **Windows**: Uses `python`, `python3`, or `py` (whichever is available)
+- **macOS/Linux**: Uses `python3` by default
+- **Automatic detection**: No manual configuration required
 
 ### Daily Reports
 

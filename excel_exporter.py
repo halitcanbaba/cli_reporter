@@ -6,6 +6,7 @@ Handles exporting results to Excel with formatting
 
 import os
 import subprocess
+import sys
 from datetime import datetime
 from typing import List, Dict
 from openpyxl import Workbook
@@ -14,7 +15,25 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 
 class ExcelExporter:
     def __init__(self):
-        pass
+        # Automatically detect correct Python command based on OS
+        self.python_cmd = self._get_python_command()
+        print(f"🐍 Using Python command: {self.python_cmd}")
+    
+    def _get_python_command(self):
+        """Get the correct Python command for current OS"""
+        if sys.platform == "win32":
+            # Test different Python commands on Windows
+            test_commands = ["python", "python3", "py"]
+            for cmd in test_commands:
+                try:
+                    result = subprocess.run([cmd, "--version"], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        return cmd
+                except:
+                    continue
+            return "python"  # Default fallback
+        else:
+            return "python3"  # Unix/Linux/macOS
     
     def export_config_report_to_xlsx(self, config_data: Dict) -> str:
         """
@@ -152,7 +171,7 @@ class ExcelExporter:
     
     def _build_daily_report_command(self, config_data: Dict) -> List[str]:
         """Build daily_report command from configuration"""
-        cmd = ["python3", "daily_report.py"]
+        cmd = [self.python_cmd, "daily_report.py"]
         
         # Add database
         if config_data.get('database'):
@@ -202,7 +221,7 @@ class ExcelExporter:
     
     def _build_deals_categorizer_command(self, config_data: Dict) -> List[str]:
         """Build deals_categorizer command from configuration"""
-        cmd = ["python3", "deals_categorizer.py"]
+        cmd = [self.python_cmd, "deals_categorizer.py"]
         
         # Add database
         if config_data.get('database'):

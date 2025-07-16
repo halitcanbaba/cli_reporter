@@ -10,6 +10,8 @@ import asyncio
 import schedule
 import time
 import threading
+import sys
+import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import inquirer
@@ -26,8 +28,28 @@ class ScheduledTaskManager:
         self.tasks = {}
         self.scheduler_thread = None
         self.stop_scheduler = False
+        
+        # Detect Python command based on OS
+        self.python_cmd = self._get_python_command()
+        
         self._ensure_config_dir()
         self._load_tasks()
+    
+    def _get_python_command(self):
+        """Get the correct Python command for current OS"""
+        if sys.platform == "win32":
+            # Test different Python commands on Windows
+            test_commands = ["python", "python3", "py"]
+            for cmd in test_commands:
+                try:
+                    result = subprocess.run([cmd, "--version"], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        return cmd
+                except:
+                    continue
+            return "python"  # Default fallback
+        else:
+            return "python3"  # Unix/Linux/macOS
     
     def _ensure_config_dir(self):
         """Ensure config directory exists"""

@@ -23,14 +23,37 @@ from scheduler import ScheduledTaskManager
 
 class TaskCreator:
     def __init__(self):
-        self.selected_config = {}
+        """Initialize the task creator with proper Python command detection"""
+        # Detect Python command based on OS
+        self.python_cmd = self._get_python_command()
+        print(f"🐍 Using Python command: {self.python_cmd}")
         
-        # Initialize modular components
+        # Initialize components
         self.config_manager = ConfigManager()
         self.db_manager = DatabaseManager()
         self.telegram = TelegramIntegration()
         self.excel_exporter = ExcelExporter()
         self.scheduler = ScheduledTaskManager()
+        
+        # Initialize configuration
+        self.selected_config = {}
+        self.execution_results = []
+    
+    def _get_python_command(self):
+        """Get the correct Python command for current OS"""
+        if sys.platform == "win32":
+            # Test different Python commands on Windows
+            test_commands = ["python", "python3", "py"]
+            for cmd in test_commands:
+                try:
+                    result = subprocess.run([cmd, "--version"], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        return cmd
+                except:
+                    continue
+            return "python"  # Default fallback
+        else:
+            return "python3"  # Unix/Linux/macOS
     
     def show_welcome(self):
         """Show welcome message"""
@@ -898,7 +921,7 @@ class TaskCreator:
         commands = []
         
         if self.selected_config['report_type'] in ['daily_report', 'combined']:
-            cmd = ["python3", "daily_report.py"]
+            cmd = [self.python_cmd, "daily_report.py"]
             cmd.extend(["--database", self.selected_config['database']])
             
             if self.selected_config['limit']:
@@ -909,7 +932,7 @@ class TaskCreator:
             commands.append(cmd)
         
         if self.selected_config['report_type'] in ['deals_categorizer', 'combined']:
-            cmd = ["python3", "deals_categorizer.py"]
+            cmd = [self.python_cmd, "deals_categorizer.py"]
             cmd.extend(["--database", self.selected_config['database']])
             
             # Use current year
