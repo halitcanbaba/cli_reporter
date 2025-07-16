@@ -196,18 +196,14 @@ class ExcelExporter:
         
         # Add limit - handle None (no limit) and 0 (no limit) correctly
         limit = config_data.get('limit')
-        print(f"[DEBUG] Config limit value: {limit} (type: {type(limit)})")
         if limit is not None and limit > 0:
             cmd.extend(["--limit", str(limit)])
-            print(f"[DEBUG] Using limit: {limit}")
         elif limit is None or limit == 0:
             # User explicitly set no limit - use --all flag if daily_report supports it
             cmd.extend(["--all"])
-            print(f"[DEBUG] Using --all flag (no limit)")
         else:
             # Use a reasonable default if limit is somehow invalid
             cmd.extend(["--limit", "100"])
-            print(f"[DEBUG] Using default limit: 100")
         
         # Add groups filter
         if config_data.get('groups'):
@@ -258,10 +254,8 @@ class ExcelExporter:
         
         # Add limit - handle None (no limit) and 0 (no limit) correctly
         limit = config_data.get('limit')
-        print(f"[DEBUG] Config limit value for deals categorizer: {limit} (type: {type(limit)})")
         if limit is not None and limit > 0:
             cmd.extend(["--limit", str(limit)])
-            print(f"[DEBUG] Using limit for deals categorizer: {limit}")
         # For deals categorizer, if no limit is specified, don't add --limit flag
         # This will let the tool use its default behavior
         
@@ -1128,3 +1122,5 @@ class ExcelExporter:
                 cleaned_cells.append(str(cell) if cell is not None else '')
         
         return cleaned_cells
+[DEBUG] Config limit value: 50 (type: <class 'int'>)
+[DEBUG] Using limit: 50
