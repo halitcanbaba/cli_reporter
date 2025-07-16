@@ -15,8 +15,15 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 # Fix Windows encoding issues
 if sys.platform == "win32":
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+    import io
+    try:
+        # Check if stdout has a buffer attribute (not in subprocess environments)
+        if hasattr(sys.stdout, 'buffer'):
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+    except (AttributeError, OSError):
+        # Fallback for subprocess environments or different Windows setups
+        pass  # Keep original stdout/stderr
 
 
 class ExcelExporter:
@@ -98,15 +105,13 @@ class ExcelExporter:
                 else:
                     print("⚠️ No deals categorizer data received")
             
-            # Create Daily Report sheet
-            if daily_report_data:
-                daily_sheet = wb.create_sheet(title="Daily_Report")
-                self._create_config_report_sheet(daily_sheet, daily_report_data, "Daily Report")
+            # Create Daily Report sheet (always create, even if no data)
+            daily_sheet = wb.create_sheet(title="Daily_Report")
+            self._create_config_report_sheet(daily_sheet, daily_report_data, "Daily Report")
             
-            # Create Deals Categorizer sheet
-            if deals_categorizer_data:
-                deals_sheet = wb.create_sheet(title="Deals_Categorizer")
-                self._create_config_deals_sheet(deals_sheet, deals_categorizer_data, "Deals Categorizer", config_data)
+            # Create Deals Categorizer sheet (always create, even if no data)
+            deals_sheet = wb.create_sheet(title="Deals_Categorizer")
+            self._create_config_deals_sheet(deals_sheet, deals_categorizer_data, "Deals Categorizer", config_data)
             
             # Save the workbook
             wb.save(filename)
@@ -269,16 +274,37 @@ class ExcelExporter:
         """Run a command and capture its output"""
         try:
             print(f"[>>] Executing: {' '.join(command[:3])}...")
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=120  # 2 minutes timeout - reduced from 5 minutes
-            )
+            
+            # Try different encoding strategies based on platform
+            if sys.platform == "win32":
+                # Windows: Try CP1252 first, then UTF-8 with error handling
+                encodings_to_try = ['cp1252', 'utf-8', 'latin-1']
+            else:
+                # Unix-like: Try UTF-8 first
+                encodings_to_try = ['utf-8', 'latin-1']
+            
+            result = None
+            for encoding in encodings_to_try:
+                try:
+                    result = subprocess.run(
+                        command,
+                        capture_output=True,
+                        text=True,
+                        encoding=encoding,
+                        errors='replace',  # Replace problematic characters
+                        timeout=120  # 2 minutes timeout
+                    )
+                    break  # Success with this encoding
+                except (UnicodeDecodeError, UnicodeError):
+                    continue  # Try next encoding
+            
+            if result is None:
+                print(f"❌ Failed to decode command output with any encoding")
+                return None
             
             if result.returncode == 0:
                 print(f"✅ Command completed successfully")
-                if result.stdout.strip():
+                if result.stdout and result.stdout.strip():
                     print(f"📝 Output length: {len(result.stdout)} characters")
                     return result.stdout
                 else:
@@ -286,7 +312,8 @@ class ExcelExporter:
                     return None
             else:
                 print(f"❌ Command failed with return code {result.returncode}")
-                print(f"📝 Error output: {result.stderr[:500]}...")
+                if result.stderr:
+                    print(f"📝 Error output: {result.stderr[:500]}...")
                 if result.stdout:
                     print(f"📝 Standard output: {result.stdout[:500]}...")
                 return None
@@ -303,6 +330,11 @@ class ExcelExporter:
         # Add title
         ws.append([f"{report_title}"])
         ws.append([])
+        
+        # Handle None output
+        if output_data is None:
+            ws.append(["No data available - command failed or produced no output"])
+            return
         
         # Parse the output data
         parsed_data = self._parse_command_output(output_data)
@@ -357,6 +389,11 @@ class ExcelExporter:
         # Add title
         ws.append([f"{report_title}"])
         ws.append([])
+        
+        # Handle None output
+        if output_data is None:
+            ws.append(["No data available - command failed or produced no output"])
+            return
         
         # Parse the deals data
         deals_data = self._parse_deals_categorizer_output(output_data)
@@ -654,10 +691,16 @@ class ExcelExporter:
     
     def _parse_command_output(self, output: str) -> List[List[str]]:
         """Parse command output to extract clean tabular data"""
+        if not output:
+            return []
+        
         lines = output.strip().split('\n')
         parsed_data = []
         
         for line in lines:
+            if not line:
+                continue
+            
             line = line.strip()
             if not line:
                 continue
@@ -684,7 +727,7 @@ class ExcelExporter:
             
             # Look for pipe-separated table data (primary format)
             if '|' in line:
-                cells = [cell.strip() for cell in line.split('|')]
+                cells = [cell.strip() if cell else '' for cell in line.split('|')]
                 cells = [cell for cell in cells if cell]  # Remove empty cells
                 if cells and len(cells) > 1:
                     # Skip separator lines (all dashes/spaces)
@@ -695,7 +738,7 @@ class ExcelExporter:
             
             # Look for CSV format data as fallback
             elif ',' in line and len(line.split(',')) > 2:
-                cells = [cell.strip() for cell in line.split(',')]
+                cells = [cell.strip() if cell else '' for cell in line.split(',')]
                 if len(cells) > 2:  # Only accept rows with more than 2 columns
                     cells = self._clean_cell_data_minimal(cells)
                     parsed_data.append(cells)
@@ -704,6 +747,9 @@ class ExcelExporter:
     
     def _parse_deals_categorizer_output(self, output: str) -> List[Dict]:
         """Parse deals categorizer output to extract deal-by-deal data"""
+        if not output:
+            return []
+            
         lines = output.strip().split('\n')
         deals = []
         in_monthly_table = False
@@ -1059,7 +1105,9 @@ class ExcelExporter:
         cleaned_cells = []
         
         for i, cell in enumerate(cells):
-            if isinstance(cell, str):
+            if cell is None:
+                cleaned_cells.append('')
+            elif isinstance(cell, str):
                 # Only basic cleaning - remove excessive whitespace and null characters
                 cleaned = cell.strip().replace('\x00', '').replace('\r', '')
                 
@@ -1069,6 +1117,6 @@ class ExcelExporter:
                 
                 cleaned_cells.append(cleaned)
             else:
-                cleaned_cells.append(cell)
+                cleaned_cells.append(str(cell) if cell is not None else '')
         
         return cleaned_cells

@@ -17,8 +17,15 @@ from tabulate import tabulate
 # Fix Windows encoding issues
 if sys.platform == "win32":
     import codecs
-    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
-    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+    import io
+    try:
+        # Check if stdout has a buffer attribute (not in subprocess environments)
+        if hasattr(sys.stdout, 'buffer'):
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer)
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer)
+    except (AttributeError, OSError):
+        # Fallback for subprocess environments or different Windows setups
+        pass  # Keep original stdout/stderr
 
 # Database connection parameters
 DB_CONFIGS = {
