@@ -1122,5 +1122,3 @@ class ExcelExporter:
                 cleaned_cells.append(str(cell) if cell is not None else '')
         
         return cleaned_cells
-[DEBUG] Config limit value: 50 (type: <class 'int'>)
-[DEBUG] Using limit: 50
