@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import os
 import re
+import json
 from tabulate import tabulate
 
 # Fix Windows encoding issues

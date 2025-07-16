@@ -262,6 +262,9 @@ class ExcelExporter:
         # Add monthly flag to get detailed data
         cmd.append("--monthly")
         
+        # Add JSON flag to get complete data instead of table output
+        cmd.append("--json")
+        
         # Add groups filter
         if config_data.get('groups'):
             cmd.extend(["--groups"] + config_data['groups'])
@@ -760,7 +763,17 @@ class ExcelExporter:
         """Parse deals categorizer output to extract deal-by-deal data"""
         if not output:
             return []
+        
+        # Try to parse as JSON first
+        try:
+            import json
+            data = json.loads(output)
+            if isinstance(data, dict) and 'deals' in data:
+                return data['deals']
+        except (json.JSONDecodeError, KeyError):
+            pass
             
+        # Fall back to table parsing
         lines = output.strip().split('\n')
         deals = []
         in_monthly_table = False
