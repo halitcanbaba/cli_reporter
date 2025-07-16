@@ -194,13 +194,20 @@ class ExcelExporter:
         elif config_data.get('start_date'):
             cmd.extend(["--date", config_data['start_date']])
         
-        # Add limit - ensure we use the same limit as the config
+        # Add limit - handle None (no limit) and 0 (no limit) correctly
         limit = config_data.get('limit')
-        if limit and limit > 0:
+        print(f"[DEBUG] Config limit value: {limit} (type: {type(limit)})")
+        if limit is not None and limit > 0:
             cmd.extend(["--limit", str(limit)])
+            print(f"[DEBUG] Using limit: {limit}")
+        elif limit is None or limit == 0:
+            # User explicitly set no limit - use --all flag if daily_report supports it
+            cmd.extend(["--all"])
+            print(f"[DEBUG] Using --all flag (no limit)")
         else:
-            # Use a reasonable default if no limit specified
+            # Use a reasonable default if limit is somehow invalid
             cmd.extend(["--limit", "100"])
+            print(f"[DEBUG] Using default limit: 100")
         
         # Add groups filter
         if config_data.get('groups'):
@@ -249,13 +256,14 @@ class ExcelExporter:
         else:
             cmd.extend(["--year", str(datetime.now().year)])
         
-        # Add limit - use config limit or reasonable default
+        # Add limit - handle None (no limit) and 0 (no limit) correctly
         limit = config_data.get('limit')
-        if limit and limit > 0:
+        print(f"[DEBUG] Config limit value for deals categorizer: {limit} (type: {type(limit)})")
+        if limit is not None and limit > 0:
             cmd.extend(["--limit", str(limit)])
-        else:
-            # Use reasonable default for deals
-            cmd.extend(["--limit", "100"])
+            print(f"[DEBUG] Using limit for deals categorizer: {limit}")
+        # For deals categorizer, if no limit is specified, don't add --limit flag
+        # This will let the tool use its default behavior
         
         # Add monthly flag to get detailed data
         cmd.append("--monthly")
