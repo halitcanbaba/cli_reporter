@@ -203,7 +203,7 @@ class DealsCategorizerTool:
             if groups:
                 group_join = "LEFT JOIN mt5_users u ON d.Login = u.Login"
                 group_placeholders = ','.join(['%s'] * len(groups))
-                where_conditions.append(f"u.Group IN ({group_placeholders})")
+                where_conditions.append(f"u.`Group` IN ({group_placeholders})")
                 query_params.extend(groups)
             
             where_clause = " AND ".join(where_conditions)
@@ -285,10 +285,11 @@ class DealsCategorizerTool:
                 where_conditions.append("d.Login <= %s")
                 query_params.append(max_login)
             
-            # Add group filter
+            # Add group filter - ensure LEFT JOIN is always included when groups are specified
+            group_join = "LEFT JOIN mt5_users u ON d.Login = u.Login"
             if groups:
                 group_placeholders = ','.join(['%s'] * len(groups))
-                where_conditions.append(f"u.Group IN ({group_placeholders})")
+                where_conditions.append(f"u.`Group` IN ({group_placeholders})")
                 query_params.extend(groups)
             
             where_clause = " AND ".join(where_conditions)
@@ -308,7 +309,7 @@ class DealsCategorizerTool:
                 u.Agent,
                 u.ZipCode
             FROM {deals_table} d
-            LEFT JOIN mt5_users u ON d.Login = u.Login
+            {group_join}
             WHERE {where_clause}
             ORDER BY d.Login ASC, d.Time ASC
             {limit_clause}
