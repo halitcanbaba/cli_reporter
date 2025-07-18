@@ -105,7 +105,9 @@ class DealsCategorizerTool:
             db_config = DB_CONFIGS[self.db_name]
             self.connection = mysql.connector.connect(**db_config)
             if self.connection.is_connected():
-                print(f"✓ Connected to MySQL database '{db_config['database']}' at {db_config['host']}")
+                # Only print connection info in non-JSON mode
+                if '--json' not in sys.argv:
+                    print(f"✓ Connected to MySQL database '{db_config['database']}' at {db_config['host']}")
                 return True
         except Error as e:
             print(f"✗ Error connecting to MySQL: {e}")
@@ -115,7 +117,9 @@ class DealsCategorizerTool:
         """Close database connection"""
         if self.connection and self.connection.is_connected():
             self.connection.close()
-            print("✓ Database connection closed.")
+            # Only print connection info in non-JSON mode
+            if '--json' not in sys.argv:
+                print("✓ Database connection closed.")
     
     def categorize_comment(self, comment: str) -> str:
         """Categorize comment based on patterns"""
@@ -250,28 +254,29 @@ class DealsCategorizerTool:
 
     def get_monthly_deals_by_login(self, year: int = None, limit: Optional[int] = None, groups: Optional[List[str]] = None, 
                                   min_login: Optional[int] = None, max_login: Optional[int] = None) -> List[Dict]:
-        """Get action=2 deals grouped by login with categories for the current month"""
+        """Get action=2 deals grouped by login with categories for the current month ONLY"""
         try:
             cursor = self.connection.cursor()
             
-            # Get current month info
+            # Get current month info - ALWAYS use current month and year
             month_info = get_current_month_info()
             current_year = month_info['year']
+            current_month = month_info['month']
             
-            # Use current year if not specified
-            if year is None:
-                year = current_year
-            
+            # ALWAYS use current year and month (ignore year parameter for current month optimization)
+            year = current_year
             deals_table = f"mt5_deals_{year}"
             
-            # Always use current month date range
+            # Use current month date range only
             month_start = month_info['month_start']
             month_end = month_info['month_end']
             
-            print(f"📊 DEALS CATEGORIZER - CURRENT MONTH DATA")
-            print(f"📅 Processing Month: {month_info['month_name']} {year}")
-            print(f"📊 Date Range: {month_start.strftime('%Y-%m-%d')} to {month_end.strftime('%Y-%m-%d')}")
-            print(f"🎯 Getting deals for current month only")
+            # Only print debug info in non-JSON mode
+            if '--json' not in sys.argv:
+                print(f"📊 DEALS CATEGORIZER - CURRENT MONTH ONLY")
+                print(f"📅 Processing Month: {month_info['month_name']} {year} (CURRENT MONTH)")
+                print(f"📊 Date Range: {month_start.strftime('%Y-%m-%d')} to {month_end.strftime('%Y-%m-%d')}")
+                print(f"🎯 OPTIMIZATION: Only current month data, ignoring historical years")
             
             # Build WHERE clause with filters
             where_conditions = ["d.Action = 2", "d.Login > 9999", "d.Time >= %s", "d.Time < %s"]
@@ -319,7 +324,9 @@ class DealsCategorizerTool:
             cursor.execute(query, query_params)
             results = cursor.fetchall()
             
-            print(f"✓ Found {len(results)} deals in current month {month_info['month_name']} {year}")
+            # Only print debug info in non-JSON mode
+            if '--json' not in sys.argv:
+                print(f"✓ Found {len(results)} deals in current month {month_info['month_name']} {year}")
             
             monthly_deals = []
             
@@ -348,24 +355,27 @@ class DealsCategorizerTool:
             return []
 
     def get_summary_by_category(self, year: int = None) -> Dict:
-        """Get summary statistics by category for the current month"""
+        """Get summary statistics by category for the current month ONLY"""
         try:
             cursor = self.connection.cursor()
             
-            # Get current month info
+            # Get current month info - ALWAYS use current month and year
             month_info = get_current_month_info()
             current_year = month_info['year']
+            current_month = month_info['month']
             
-            # Use current year if not specified
-            if year is None:
-                year = current_year
+            # ALWAYS use current year and month (ignore year parameter for current month optimization)
+            year = current_year
+            deals_table = f"mt5_deals_{year}"
             
-            # Always use current month date range
+            # Use current month date range only
             month_start = month_info['month_start']
             month_end = month_info['month_end']
             
-            print(f"📊 SUMMARY: Getting summary for CURRENT MONTH: {month_start.strftime('%Y-%m-%d')} to {month_end.strftime('%Y-%m-%d')}")
-            print(f"🎯 PERFORMANCE: Processing deals for current month only")
+            # Only print debug info in non-JSON mode
+            if '--json' not in sys.argv:
+                print(f"📊 SUMMARY: Current month ONLY: {month_start.strftime('%Y-%m-%d')} to {month_end.strftime('%Y-%m-%d')}")
+                print(f"🎯 OPTIMIZATION: Ignoring all historical data, current month focus")
             
             deals_table = f"mt5_deals_{year}"
             
@@ -568,7 +578,7 @@ def print_summary_table(summary: Dict):
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(
-        description="Categorize deals with Action=2 based on comment patterns",
+        description="Categorize deals with Action=2 based on comment patterns - CURRENT MONTH OPTIMIZATION",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Categories:
@@ -576,12 +586,16 @@ Categories:
   - Withdrawal: Comments starting with "WT", "WITH", or "CANCELLED WITH"
   - Promotion: All other comments
 
+🚀 OPTIMIZATION: Always processes current month data only for optimal performance.
+Historical data (2024 and earlier) is ignored for faster processing.
+
 Examples:
-  python deals_categorizer.py                     # Analyze 2025 deals
-  python deals_categorizer.py -y 2024             # Analyze 2024 deals
-  python deals_categorizer.py -l 100              # Limit to 100 deals
-  python deals_categorizer.py --samples           # Show comment samples
-  python deals_categorizer.py --summary-only      # Show only summary
+  python deals_categorizer.py                     # Analyze current month (July 2025)
+  python deals_categorizer.py --monthly           # Current month deals grouped by login
+  python deals_categorizer.py -l 100              # Limit to 100 deals (current month)
+  python deals_categorizer.py --samples           # Show comment samples (current month)
+  python deals_categorizer.py --summary-only      # Show only summary (current month)
+  python deals_categorizer.py --json              # JSON output (current month)
         """
     )
     
@@ -595,8 +609,8 @@ Examples:
     parser.add_argument(
         '-y', '--year',
         type=int,
-        default=2025,
-        help='Year to analyze (default: 2025)'
+        default=datetime.now().year,
+        help=f'Year to analyze (default: {datetime.now().year} - current year, always uses current month)'
     )
     
     parser.add_argument(
@@ -650,8 +664,10 @@ Examples:
     
     args = parser.parse_args()
     
-    print("[C] Deals Categorizer Tool")
-    print("=" * 50)
+    # Only print header in non-JSON mode
+    if not args.json:
+        print("[C] Deals Categorizer Tool")
+        print("=" * 50)
     
     # Initialize categorizer
     categorizer = DealsCategorizerTool(args.database)
@@ -674,7 +690,8 @@ Examples:
             return
         
         # Get categorized deals
-        print(f"\n🔍 Analyzing deals for year {args.year}...")
+        if not args.json:
+            print(f"\n🔍 Analyzing deals for year {args.year}...")
         
         if args.monthly:
             deals = categorizer.get_monthly_deals_by_login(args.year, args.limit, args.groups, args.min_login, args.max_login)
@@ -682,7 +699,8 @@ Examples:
             deals = categorizer.get_categorized_deals(args.year, args.limit, args.groups, args.min_login, args.max_login)
         
         if not deals:
-            print("✗ No deals found")
+            if not args.json:
+                print("✗ No deals found")
             sys.exit(1)
         
         # Output results
